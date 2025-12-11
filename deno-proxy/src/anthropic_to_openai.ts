@@ -35,7 +35,10 @@ function normalizeBlocks(content: string | ClaudeContentBlock[], triggerSignal?:
       return `${THINKING_START_TAG}${block.thinking}${THINKING_END_TAG}`;
     }
     if (block.type === "tool_result") {
-      return `<tool_result id="${block.tool_use_id}">${block.content ?? ""}</tool_result>`;
+      const contentStr = typeof block.content === "string"
+        ? block.content
+        : JSON.stringify(block.content ?? "");
+      return `<tool_result id="${block.tool_use_id}">${contentStr}</tool_result>`;
     }
     if (block.type === "tool_use") {
       // 只有从 tool_use 转换的 <invoke> 标签才会带触发信号

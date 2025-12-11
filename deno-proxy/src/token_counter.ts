@@ -44,7 +44,10 @@ export function extractTextFromMessages(messages: ClaudeMessage[]): string {
           return `<invoke name="${block.name}">${JSON.stringify(block.input)}</invoke>`;
         }
         if (block.type === "tool_result") {
-          return `<tool_result>${block.content}</tool_result>`;
+          const contentStr = typeof block.content === "string"
+            ? block.content
+            : JSON.stringify(block.content ?? "");
+          return `<tool_result>${contentStr}</tool_result>`;
         }
         return "";
       })
