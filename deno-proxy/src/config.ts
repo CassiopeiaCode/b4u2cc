@@ -1,7 +1,18 @@
+/// <reference lib="deno.ns" />
+
+export interface UpstreamConfig {
+  baseUrl: string;
+  apiKey?: string;
+  requestModel: string; // 实际向上游请求的模型名
+  nameModel: string; // 客户端使用的模型名，唯一
+}
+
 export interface ProxyConfig {
   port: number;
   host: string;
-  upstreamBaseUrl: string;
+  upstreamConfigs: UpstreamConfig[];
+  // 向后兼容的旧字段（如果未设置 upstreamConfigs 则使用）
+  upstreamBaseUrl?: string;
   upstreamApiKey?: string;
   upstreamModelOverride?: string;
   clientApiKey?: string;
@@ -50,12 +61,30 @@ function parseTokenMultiplier(raw: string | undefined): number {
   return num;
 }
 
-export function loadConfig(): ProxyConfig {
-  const upstreamBaseUrl = Deno.env.get("UPSTREAM_BASE_URL") ?? "http://127.0.0.1:8000/v1/chat/completions";
-  if (!upstreamBaseUrl) {
-    throw new Error("UPSTREAM_BASE_URL must be provided");
+function loadUpstreamConfigs(): UpstreamConfig[] {
+  const configs: UpstreamConfig[] = [];
+  let i = 1;
+  while (true) {
+    const baseUrl = Deno.env.get(`UPSTREAM_CONFIG_${i}_BASE_URL`);
+    const apiKey = Deno.env.get(`UPSTREAM_CONFIG_${i}_API_KEY`);
+    const requestModel = Deno.env.get(`UPSTREAM_CONFIG_${i}_REQUEST_MODEL`);
+    const nameModel = Deno.env.get(`UPSTREAM_CONFIG_${i}_NAME_MODEL`);
+    if (!baseUrl || !requestModel || !nameModel) {
+      // 如果缺少必要字段，停止搜索（假设没有更多配置）
+      break;
+    }
+    configs.push({
+      baseUrl,
+      apiKey,
+      requestModel,
+      nameModel,
+    });
+    i++;
   }
+  return configs;
+}
 
+export function loadConfig(): ProxyConfig {
   // 检查是否启用自动端口配置
   const autoPort = Deno.env.get("AUTO_PORT") === "true";
   
@@ -63,8 +92,6 @@ export function loadConfig(): ProxyConfig {
   // 否则使用环境变量指定的端口或默认端口 3456
   const port = autoPort ? 0 : Number(Deno.env.get("PORT") ?? "3456");
   const host = Deno.env.get("HOST") ?? "0.0.0.0";
-  const upstreamApiKey = Deno.env.get("UPSTREAM_API_KEY");
-  const upstreamModelOverride = Deno.env.get("UPSTREAM_MODEL");
   const clientApiKey = Deno.env.get("CLIENT_API_KEY");
   const requestTimeoutMs = Number(Deno.env.get("TIMEOUT_MS") ?? "120000");
   const aggregationIntervalMs = Number(Deno.env.get("AGGREGATION_INTERVAL_MS") ?? "35");
@@ -72,9 +99,27 @@ export function loadConfig(): ProxyConfig {
   // 解析 tokenMultiplier，并对非法值进行兜底，避免出现 NaN/Infinity
   const tokenMultiplier = parseTokenMultiplier(Deno.env.get("TOKEN_MULTIPLIER"));
 
+  // 加载多组上游配置
+  const upstreamConfigs = loadUpstreamConfigs();
+
+  // 向后兼容：如果未设置多组配置，则使用旧的环境变量
+  let upstreamBaseUrl: string | undefined;
+  let upstreamApiKey: string | undefined;
+  let upstreamModelOverride: string | undefined;
+
+  if (upstreamConfigs.length === 0) {
+    upstreamBaseUrl = Deno.env.get("UPSTREAM_BASE_URL") ?? "http://127.0.0.1:8000/v1/chat/completions";
+    if (!upstreamBaseUrl) {
+      throw new Error("UPSTREAM_BASE_URL must be provided when no UPSTREAM_CONFIG_* defined");
+    }
+    upstreamApiKey = Deno.env.get("UPSTREAM_API_KEY");
+    upstreamModelOverride = Deno.env.get("UPSTREAM_MODEL");
+  }
+
   return {
     port,
     host,
+    upstreamConfigs,
     upstreamBaseUrl,
     upstreamApiKey,
     upstreamModelOverride,

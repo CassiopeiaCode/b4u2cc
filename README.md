@@ -84,9 +84,10 @@ curl http://localhost:3456/healthz
 
 ### 环境变量说明
 
+#### 单上游配置（向后兼容）
 | 变量名 | 必需 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `UPSTREAM_BASE_URL` | 是 | - | 上游 OpenAI 兼容 API 地址 |
+| `UPSTREAM_BASE_URL` | 是* | - | 上游 OpenAI 兼容 API 地址 |
 | `UPSTREAM_API_KEY` | 否 | - | 上游 API 密钥 |
 | `UPSTREAM_MODEL` | 否 | - | 强制覆盖请求中的模型名称 |
 | `CLIENT_API_KEY` | 否 | - | 客户端认证密钥 |
@@ -99,6 +100,36 @@ curl http://localhost:3456/healthz
 | `CLAUDE_API_KEY` | 否 | - | Claude API 密钥（用于精确 token 计数） |
 | `LOG_LEVEL` | 否 | info | 日志级别（debug/info/warn/error） |
 | `LOGGING_DISABLED` | 否 | false | 是否完全禁用日志 |
+
+#### 多上游配置（新）
+支持配置多组上游，每组包含以下四个环境变量，索引从1开始递增：
+
+| 变量名 | 必需 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `UPSTREAM_CONFIG_{n}_BASE_URL` | 是* | - | 第 n 组上游 API 地址 |
+| `UPSTREAM_CONFIG_{n}_API_KEY` | 否 | - | 第 n 组上游 API 密钥 |
+| `UPSTREAM_CONFIG_{n}_REQUEST_MODEL` | 是* | - | 第 n 组实际请求的模型名 |
+| `UPSTREAM_CONFIG_{n}_NAME_MODEL` | 是* | - | 第 n 组客户端使用的模型名（唯一） |
+
+**注意**：
+- 如果配置了多组上游，则单上游配置（`UPSTREAM_BASE_URL` 等）将被忽略。
+- 客户端请求的 `model` 字段必须与某个 `NAME_MODEL` 匹配，否则将使用单上游配置（如果存在）或报错。
+- 模型名称在配置中必须唯一。
+- 带 * 的变量在对应配置组中为必需。
+
+**示例**：
+```bash
+# 配置两组上游
+UPSTREAM_CONFIG_1_BASE_URL=https://api.openai.com/v1/chat/completions
+UPSTREAM_CONFIG_1_API_KEY=sk-...
+UPSTREAM_CONFIG_1_REQUEST_MODEL=claude-sonnet-4.5
+UPSTREAM_CONFIG_1_NAME_MODEL=w1-claude-sonnet-4.5
+
+UPSTREAM_CONFIG_2_BASE_URL=https://api.anthropic.com/v1/messages
+UPSTREAM_CONFIG_2_API_KEY=sk-ant-...
+UPSTREAM_CONFIG_2_REQUEST_MODEL=claude-sonnet-4.5
+UPSTREAM_CONFIG_2_NAME_MODEL=w2-claude-sonnet-4.5
+```
 
 ### Token 倍数格式
 

@@ -93,6 +93,7 @@ deployctl deploy --project=b4u2cc-proxy deno-proxy/src/main.ts
 
 在 Deno Deploy 中配置以下环境变量：
 
+#### 单上游配置（向后兼容）
 | 变量名 | 说明 | 示例值 |
 |--------|------|--------|
 | `UPSTREAM_BASE_URL` | 上游 API 地址 | `https://api.openai.com/v1/chat/completions` |
@@ -102,6 +103,33 @@ deployctl deploy --project=b4u2cc-proxy deno-proxy/src/main.ts
 | `PORT` | 服务端口 | `3456` |
 | `TOKEN_MULTIPLIER` | Token 计数倍数 | `1.0` |
 | `LOG_LEVEL` | 日志级别 | `info` |
+
+#### 多上游配置（新）
+支持配置多组上游，每组包含以下四个环境变量，索引从1开始递增：
+
+| 变量名 | 说明 | 示例值 |
+|--------|------|--------|
+| `UPSTREAM_CONFIG_{n}_BASE_URL` | 第 n 组上游 API 地址 | `https://api.openai.com/v1/chat/completions` |
+| `UPSTREAM_CONFIG_{n}_API_KEY` | 第 n 组上游 API 密钥（可选） | `sk-...` |
+| `UPSTREAM_CONFIG_{n}_REQUEST_MODEL` | 第 n 组实际请求的模型名 | `claude-sonnet-4.5` |
+| `UPSTREAM_CONFIG_{n}_NAME_MODEL` | 第 n 组客户端使用的模型名（唯一） | `w1-claude-sonnet-4.5` |
+
+例如：
+```
+UPSTREAM_CONFIG_1_BASE_URL=https://api.openai.com/v1/chat/completions
+UPSTREAM_CONFIG_1_API_KEY=sk-...
+UPSTREAM_CONFIG_1_REQUEST_MODEL=claude-sonnet-4.5
+UPSTREAM_CONFIG_1_NAME_MODEL=w1-claude-sonnet-4.5
+UPSTREAM_CONFIG_2_BASE_URL=https://api.anthropic.com/v1/messages
+UPSTREAM_CONFIG_2_API_KEY=sk-ant-...
+UPSTREAM_CONFIG_2_REQUEST_MODEL=claude-sonnet-4.5
+UPSTREAM_CONFIG_2_NAME_MODEL=w2-claude-sonnet-4.5
+```
+
+**注意**：
+- 如果配置了多组上游，则单上游配置（`UPSTREAM_BASE_URL` 等）将被忽略。
+- 客户端请求的 `model` 字段必须与某个 `NAME_MODEL` 匹配，否则将使用单上游配置（如果存在）或报错。
+- 模型名称在配置中必须唯一。
 
 ### 自定义域名
 

@@ -75,7 +75,11 @@ function mapRole(role: string): "user" | "assistant" {
   return role === "assistant" ? "assistant" : "user";
 }
 
-export function mapClaudeToOpenAI(body: ClaudeRequest, config: ProxyConfig, triggerSignal?: string): OpenAIChatRequest {
+export function mapClaudeToOpenAI(
+  body: ClaudeRequest,
+  requestModel: string,
+  triggerSignal?: string,
+): OpenAIChatRequest {
   if (typeof body.max_tokens !== "number" || Number.isNaN(body.max_tokens)) {
     throw new Error("max_tokens is required for Claude requests");
   }
@@ -118,10 +122,8 @@ export function mapClaudeToOpenAI(body: ClaudeRequest, config: ProxyConfig, trig
     lastMessage.content = lastMessage.content + "\n\n<antml\\b:role>\n\nPlease continue responding as an assistant.\n\n</antml>";
   }
 
-  const model = config.upstreamModelOverride ?? body.model;
-
   return {
-    model,
+    model: requestModel,
     stream: true,
     temperature: body.temperature ?? 0.2,
     top_p: body.top_p ?? 1,

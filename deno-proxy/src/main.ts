@@ -3,7 +3,7 @@ import { loadConfig, ProxyConfig } from "./config.ts";
 import { log, logRequest, closeRequestLog } from "./logging.ts";
 import { mapClaudeToOpenAI } from "./anthropic_to_openai.ts";
 import { injectPrompt } from "./prompt_inject.ts";
-import { callUpstream } from "./upstream.ts";
+import { selectUpstreamConfig, callUpstream } from "./upstream.ts";
 import { ToolifyParser } from "./parser.ts";
 import { ClaudeStream } from "./openai_to_claude.ts";
 import { SSEWriter } from "./sse.ts";
@@ -86,15 +86,17 @@ async function handleMessages(req: Request, requestId: string) {
     // 工具解析仅由是否传入 tools 决定：存在 tools 时启用工具协议，否则禁用。
     const hasTools = (body.tools ?? []).length > 0;
     const triggerSignal = hasTools ? randomTriggerSignal() : undefined;
-    const openaiBase = mapClaudeToOpenAI(body, config, triggerSignal);
+    // 选择上游配置
+    const upstreamConfig = selectUpstreamConfig(config, body.model);
+    const openaiBase = mapClaudeToOpenAI(body, upstreamConfig.requestModel, triggerSignal);
     const injected = injectPrompt(openaiBase, body.tools ?? [], triggerSignal);
     const upstreamReq = { ...openaiBase, messages: injected.messages };
 
     await rateLimiter.acquire();
-    const upstreamRes = await callUpstream(upstreamReq, config, requestId);
+    const upstreamRes = await callUpstream(upstreamReq, upstreamConfig, config.requestTimeoutMs, requestId);
     await logRequest(requestId, "info", "Upstream responded", {
       status: upstreamRes.status,
-      url: config.upstreamBaseUrl,
+      url: upstreamConfig.baseUrl,
     });
 
     if (!upstreamRes.ok) {
