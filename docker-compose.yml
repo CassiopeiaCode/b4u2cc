@@ -1,0 +1,33 @@
+# 使用 docker compose 快速启动 b4u2cc 代理
+version: "3.8"
+
+services:
+  b4u2cc-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DENO_VERSION: ${DENO_VERSION:-2.0.0}
+    image: b4u2cc-proxy:local
+    container_name: b4u2cc-proxy
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3456
+      LOG_LEVEL: info
+      UPSTREAM_BASE_URL: https://api.openai.com/v1/chat/completions
+      UPSTREAM_API_KEY: changeme-upstream-key
+      CLIENT_API_KEY: changeme-client-key
+      TIMEOUT_MS: 120000
+      MAX_REQUESTS_PER_MINUTE: 60
+      TOKEN_MULTIPLIER: "1.0"
+    ports:
+      - "3456:3456"
+    volumes:
+      - ./logs:/app/deno-proxy/logs
+    networks:
+      - b4u2cc-net
+
+networks:
+  b4u2cc-net:
+    driver: bridge
